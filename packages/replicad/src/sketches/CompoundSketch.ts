@@ -1,4 +1,3 @@
-import { localGC } from "../register.js";
 import {
   compoundShapes,
   addHolesInFace,
@@ -22,36 +21,35 @@ import { getOC } from "../oclib.js";
 
 const guessFaceFromWires = (wires: Wire[]): Face => {
   const oc = getOC();
-  const [r, gc] = localGC();
 
-  const faceBuilder = r(
-    new oc.BRepOffsetAPI_MakeFilling(
-      3,
-      15,
-      2,
-      false,
-      1e-5,
-      1e-4,
-      1e-2,
-      0.1,
-      8,
-      9
-    )
+  const faceBuilder = new oc.BRepOffsetAPI_MakeFilling(
+    3,
+    15,
+    2,
+    false,
+    1e-5,
+    1e-4,
+    1e-2,
+    0.1,
+    8,
+    9
   );
   wires.forEach((wire, wireIndex) => {
     wire.edges.forEach((edge) => {
       faceBuilder.Add_1(
-        r(edge).wrapped,
+        edge.wrapped,
         oc.GeomAbs_Shape.GeomAbs_C0 as any,
         wireIndex === 0
       );
     });
   });
 
-  faceBuilder.Build();
+  const progress = new oc.Message_ProgressRange_1();
+  faceBuilder.Build(progress);
+  progress.delete();
   const newFace = cast(faceBuilder.Shape());
 
-  gc();
+  faceBuilder.delete();
 
   if (!(newFace instanceof Face)) {
     throw new Error("Failed to create a face");
@@ -67,6 +65,7 @@ const fixWire = (wire: Wire, baseFace: Face): Wire => {
     1e-9
   );
   wireFixer.FixEdgeCurves();
+  wireFixer.delete();
   return wire;
 };
 
@@ -82,33 +81,28 @@ const faceFromWires = (wires: Wire[]): Face => {
     holeWires = wires.slice(1).map((w) => fixWire(w, baseFace));
   }
 
-  baseFace.delete();
-  const newFace = addHolesInFace(baseFace, holeWires);
-
-  return newFace;
+  return addHolesInFace(baseFace, holeWires);
 };
 
 const solidFromShellGenerator = (
   sketches: Sketch[],
   shellGenerator: (sketch: Sketch) => [Shell, Wire, Wire]
 ): Shape3D => {
-  const [r, gc] = localGC();
   const shells: Shell[] = [];
   const startWires: Wire[] = [];
   const endWires: Wire[] = [];
 
   sketches.forEach((sketch) => {
     const [shell, startWire, endWire] = shellGenerator(sketch);
-    shells.push(r(shell));
-    startWires.push(r(startWire));
-    endWires.push(r(endWire));
+    shells.push(shell);
+    startWires.push(startWire);
+    endWires.push(endWire);
   });
 
   const startFace = faceFromWires(startWires);
   const endFace = faceFromWires(endWires);
   const solid = makeSolid([startFace, ...shells, endFace]);
 
-  gc();
   return solid;
 };
 
@@ -144,15 +138,12 @@ export default class CompoundSketch implements SketchInterface {
   }
 
   face() {
-    const [r, gc] = localGC();
-
-    const baseFace = r(this.outerSketch.face());
+    const baseFace = this.outerSketch.face();
     const newFace = addHolesInFace(
       baseFace,
-      this.innerSketches.map((s) => r(s).wire)
+      this.innerSketches.map((s) => s.wire)
     );
 
-    gc();
     return newFace;
   }
 
@@ -170,13 +161,11 @@ export default class CompoundSketch implements SketchInterface {
       origin?: Point;
     } = {}
   ): Shape3D {
-    const [r, gc] = localGC();
-
-    const extrusionVec = r(
-      new Vector(extrusionDirection || this.outerSketch.defaultDirection)
-        .normalized()
-        .multiply(extrusionDistance)
-    );
+    const extrusionVec = new Vector(
+      extrusionDirection || this.outerSketch.defaultDirection
+    )
+      .normalized()
+      .multiply(extrusionDistance);
 
     if (extrusionProfile && !twistAngle) {
       const solid = solidFromShellGenerator(this.sketches, (sketch: Sketch) =>
@@ -188,8 +177,6 @@ export default class CompoundSketch implements SketchInterface {
           true
         )
       );
-      gc();
-      this.delete();
       return solid;
     }
 
@@ -204,14 +191,11 @@ export default class CompoundSketch implements SketchInterface {
           true
         )
       );
-      gc();
-      this.delete();
       return solid;
     }
 
-    const solid = basicFaceExtrusion(r(this.face()), extrusionVec);
+    const solid = basicFaceExtrusion(this.face(), extrusionVec);
 
-    gc();
     return solid;
   }
 
@@ -223,13 +207,11 @@ export default class CompoundSketch implements SketchInterface {
     revolutionAxis?: Point,
     { origin }: { origin?: Point } = {}
   ): Shape3D {
-    const [r, gc] = localGC();
     const solid = revolution(
-      r(this.face()),
+      this.face(),
       origin || this.outerSketch.defaultOrigin,
       revolutionAxis
     );
-    gc();
     return solid;
   }
 

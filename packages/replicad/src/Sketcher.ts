@@ -2,7 +2,7 @@ import { Plane, PlaneName, Point, Vector } from "./geom";
 import { makePlane } from "./geomHelpers";
 import { localGC } from "./register";
 import { DEG2RAD, RAD2DEG } from "./constants";
-import { distance2d, angle2d, polarToCartesian, Point2D } from "./lib2d";
+import { distance2d, polarAngle2d, polarToCartesian, Point2D } from "./lib2d";
 import {
   makeLine,
   makeThreePointArc,
@@ -205,6 +205,28 @@ export default class Sketcher implements GenericSketcher<Sketch> {
     return this.sagittaArc(distance, 0, sagitta);
   }
 
+  bulgeArcTo(end: Point2D, bulge: number): this {
+    if (!bulge) return this.lineTo(end);
+    const pointer = this.plane.toLocalCoords(this.pointer);
+    const halfChord = distance2d([pointer.x, pointer.y], end) / 2;
+    const bulgeAsSagitta = -bulge * halfChord;
+
+    return this.sagittaArcTo(end, bulgeAsSagitta);
+  }
+
+  bulgeArc(xDist: number, yDist: number, bulge: number): this {
+    const pointer = this.plane.toLocalCoords(this.pointer);
+    return this.bulgeArcTo([xDist + pointer.x, yDist + this.pointer.y], bulge);
+  }
+
+  vBulgeArc(distance: number, bulge: number): this {
+    return this.bulgeArc(0, distance, bulge);
+  }
+
+  hBulgeArc(distance: number, bulge: number): this {
+    return this.bulgeArc(distance, 0, bulge);
+  }
+
   ellipseTo(
     end: Point2D,
     horizontalRadius: number,
@@ -291,7 +313,7 @@ export default class Sketcher implements GenericSketcher<Sketch> {
     const pointer = this.plane.toLocalCoords(this.pointer);
     const start: Point2D = [pointer.x, pointer.y];
 
-    const angle = angle2d(end, start);
+    const angle = polarAngle2d(end, start);
     const distance = distance2d(end, start);
 
     return this.ellipseTo(

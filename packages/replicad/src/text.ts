@@ -16,7 +16,9 @@ const FONT_REGISTER: Record<string, opentype.Font> = {};
  */
 export const loadFont = async (fontPath: string, fontFamily = "default") => {
   // @ts-expect-error missing info in the types
-  const font = await opentype.load(fontPath, null, { isUrl: true });
+  const font: opentype.Font = await opentype.load(fontPath, null, {
+    isUrl: true,
+  });
   FONT_REGISTER[fontFamily] = font;
   if (!FONT_REGISTER.default) FONT_REGISTER.default = font;
 
@@ -81,8 +83,6 @@ const sketchFontCommands = function* (commands: opentype.PathCommand[]) {
 /**
  * Creates the `Blueprints` of a text, in a defined font size and a font familiy
  * (which will be the default).
- *
- * @category Blueprints
  */
 export function textBlueprints(
   text: string,
@@ -97,8 +97,6 @@ export function textBlueprints(
 /**
  * Creates the `Sketches` of a text, in a defined font size and a font familiy
  * (which will be the default).
- *
- * @category Sketching
  */
 export function sketchText(
   text: string,

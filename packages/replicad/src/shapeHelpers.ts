@@ -253,6 +253,14 @@ export const makeTangentArc = (
   return edge;
 };
 
+/*
+const assembleEdgesAsWire = (listOfEdges: (Edge)[]): Wire => {
+    const edges
+
+
+}
+*/
+
 export const assembleWire = (listOfEdges: (Edge | Wire)[]): Wire => {
   const oc = getOC();
   const wireBuilder = new oc.BRepBuilderAPI_MakeWire_1();
@@ -265,10 +273,29 @@ export const assembleWire = (listOfEdges: (Edge | Wire)[]): Wire => {
     }
   });
 
-  wireBuilder.Build();
+  const progress = new oc.Message_ProgressRange_1();
+  wireBuilder.Build(progress);
+  const res = wireBuilder.Error();
+  if (res !== oc.BRepBuilderAPI_WireError.BRepBuilderAPI_WireDone) {
+    const errorNames = new Map([
+      [oc.BRepBuilderAPI_WireError.BRepBuilderAPI_EmptyWire, "empty wire"],
+      [
+        oc.BRepBuilderAPI_WireError.BRepBuilderAPI_NonManifoldWire,
+        "non manifold wire",
+      ],
+      [
+        oc.BRepBuilderAPI_WireError.BRepBuilderAPI_DisconnectedWire,
+        "disconnected wire",
+      ],
+    ]);
+    throw new Error(
+      `Failed to build the wire, ${errorNames.get(res) || "unknown error"}`
+    );
+  }
 
   const wire = new Wire(wireBuilder.Wire());
   wireBuilder.delete();
+  progress.delete();
   return wire;
 };
 
@@ -324,7 +351,8 @@ export const makeNonPlanarFace = (wire: Wire): Face => {
     );
   });
 
-  faceBuilder.Build();
+  const progress = r(new oc.Message_ProgressRange_1());
+  faceBuilder.Build(progress);
   const newFace = cast(faceBuilder.Shape());
 
   gc();
@@ -377,7 +405,9 @@ export const makeOffset = (
   tolerance = 1e-6
 ): Shape3D => {
   const oc = getOC();
-  const offsetBuilder = new oc.BRepOffsetAPI_MakeOffsetShape_2(
+  const progress = new oc.Message_ProgressRange_1();
+  const offsetBuilder = new oc.BRepOffsetAPI_MakeOffsetShape();
+  offsetBuilder.PerformByJoin(
     face.wrapped,
     offset,
     tolerance,
@@ -385,11 +415,13 @@ export const makeOffset = (
     false,
     false,
     oc.GeomAbs_JoinType.GeomAbs_Arc as any,
-    false
+    false,
+    progress
   );
 
   const newShape = cast(downcast(offsetBuilder.Shape()));
   offsetBuilder.delete();
+  progress.delete();
 
   if (!isShape3D(newShape)) throw new Error("Could not offset to a 3d shape");
   return newShape;

@@ -17,6 +17,7 @@ import {
   BoundingBox2d,
   Curve2D,
   samePoint,
+  isPoint2D,
 } from "../lib2d";
 import { assembleWire } from "../shapeHelpers";
 import { Face } from "../shapes";
@@ -25,9 +26,10 @@ import Sketch from "../sketches/Sketch";
 import { getOC } from "../oclib.js";
 import { Plane, PlaneName, Point } from "../geom";
 import { DEG2RAD } from "../constants";
-import { BlueprintInterface } from "./lib";
+import { DrawingInterface } from "./lib";
 import round5 from "../utils/round5";
 import { asSVG, viewbox } from "./svg";
+import { GCWithScope } from "../register";
 
 /**
  * A Blueprint is an abstract Sketch, a 2D set of curves that can then be
@@ -35,12 +37,17 @@ import { asSVG, viewbox } from "./svg";
  *
  * You should create them by "sketching" with a `BlueprintSketcher`
  */
-export default class Blueprint implements BlueprintInterface {
+export default class Blueprint implements DrawingInterface {
   curves: Curve2D[];
   protected _boundingBox: null | BoundingBox2d;
+  private _orientation: null | "clockwise" | "counterClockwise";
+  private _guessedOrientation: null | "clockwise" | "counterClockwise";
   constructor(curves: Curve2D[]) {
     this.curves = curves;
     this._boundingBox = null;
+
+    this._orientation = null;
+    this._guessedOrientation = null;
   }
 
   delete() {
@@ -52,11 +59,40 @@ export default class Blueprint implements BlueprintInterface {
     return new Blueprint(this.curves);
   }
 
+  get repr() {
+    return ["Blueprint", ...this.curves.map((c) => c.repr)].join("\n");
+  }
+
   get boundingBox(): BoundingBox2d {
     if (!this._boundingBox) {
       this._boundingBox = curvesBoundingBox(this.curves);
     }
     return this._boundingBox;
+  }
+
+  get orientation(): "clockwise" | "counterClockwise" {
+    if (this._orientation) return this._orientation;
+    if (this._guessedOrientation) return this._guessedOrientation;
+
+    const vertices = this.curves.flatMap((c) => {
+      if (c.geomType !== "LINE") {
+        // We just go with a simple approximation here, we should use some extrema
+        // points instead, but this is quick (and good enough for now)
+        return [c.firstPoint, c.value(0.5)];
+      }
+      return [c.firstPoint];
+    });
+
+    const approximateArea = vertices
+      .map((v1, i) => {
+        const v2 = vertices[(i + 1) % vertices.length];
+        return (v2[0] - v1[0]) * (v2[1] + v1[1]);
+      })
+      .reduce((a, b) => a + b, 0);
+
+    this._guessedOrientation =
+      approximateArea > 0 ? "clockwise" : "counterClockwise";
+    return this._guessedOrientation;
   }
 
   stretch(
@@ -78,15 +114,20 @@ export default class Blueprint implements BlueprintInterface {
     return new Blueprint(curves);
   }
 
-  rotate(angle: number, center: Point2D): Blueprint {
+  rotate(angle: number, center?: Point2D): Blueprint {
     const curves = rotateTransform2d(angle * DEG2RAD, center).transformCurves(
       this.curves
     );
     return new Blueprint(curves);
   }
 
-  translate(xDist: number, yDist: number): Blueprint {
-    const curves = translationTransform2d([xDist, yDist]).transformCurves(
+  translate(xDist: number, yDist: number): Blueprint;
+  translate(translationVector: Point2D): Blueprint;
+  translate(xDistOrPoint: number | Point2D, yDist = 0): Blueprint {
+    const translationVector = isPoint2D(xDistOrPoint)
+      ? xDistOrPoint
+      : ([xDistOrPoint, yDist] as Point2D);
+    const curves = translationTransform2d(translationVector).transformCurves(
       this.curves
     );
     return new Blueprint(curves);
@@ -133,6 +174,7 @@ export default class Blueprint implements BlueprintInterface {
 
     const wireFixer = new oc.ShapeFix_Wire_2(wire.wrapped, face.wrapped, 1e-9);
     wireFixer.FixEdgeCurves();
+    wireFixer.delete();
 
     const sketch = new Sketch(wire);
 
@@ -140,6 +182,9 @@ export default class Blueprint implements BlueprintInterface {
       const baseFace = sketch.clone().face();
       sketch.defaultOrigin = baseFace.pointOnSurface(0.5, 0.5);
       sketch.defaultDirection = baseFace.normalAt();
+      if (baseFace.orientation !== face.orientation) {
+        sketch.defaultDirection = sketch.defaultDirection.multiply(-1);
+      }
       sketch.baseFace = face;
     } else {
       const startPoint = wire.startPoint;
@@ -151,12 +196,21 @@ export default class Blueprint implements BlueprintInterface {
   }
 
   toSVGPathD() {
-    const oc = getOC();
+    const r = GCWithScope();
     const bp = this.clone().mirror([1, 0], [0, 0], "plane");
 
-    const path = bp.curves.map((c) => {
-      const adaptor = new oc.Geom2dAdaptor_Curve_2(c.wrapped);
-      return adaptedCurveToPathElem(adaptor, c.lastPoint);
+    const path = bp.curves.flatMap((c) => {
+      if (
+        (c.geomType === "ELLIPSE" || c.geomType === "CIRCLE") &&
+        samePoint(c.firstPoint, c.lastPoint)
+      ) {
+        const [c1, c2] = c.splitAt([0.5]);
+        return [
+          adaptedCurveToPathElem(r(c1.adaptor()), c1.lastPoint),
+          adaptedCurveToPathElem(r(c2.adaptor()), c2.lastPoint),
+        ];
+      }
+      return adaptedCurveToPathElem(r(c.adaptor()), c.lastPoint);
     });
 
     const [startX, startY] = bp.curves[0].firstPoint;
@@ -190,13 +244,19 @@ export default class Blueprint implements BlueprintInterface {
   }
 
   isInside(point: Point2D): boolean {
+    if (!this.boundingBox.containsPoint(point)) return false;
+
     const oc = getOC();
     const intersector = new oc.Geom2dAPI_InterCurveCurve_1();
     const segment = make2dSegmentCurve(point, this.boundingBox.outsidePoint());
     let crossCounts = 0;
 
+    const onCurve = this.curves.find((c) => c.isOnCurve(point));
+    if (onCurve) return false;
+
     this.curves.forEach((c) => {
-      intersector.Init_1(segment.wrapped, c.wrapped, 1e-6);
+      if (c.boundingBox.isOut(segment.boundingBox)) return;
+      intersector.Init_1(segment.wrapped, c.wrapped, 1e-9);
       crossCounts += intersector.NbPoints();
     });
 
@@ -212,12 +272,18 @@ export default class Blueprint implements BlueprintInterface {
   intersects(other: Blueprint) {
     const oc = getOC();
     const intersector = new oc.Geom2dAPI_InterCurveCurve_1();
+
+    if (this.boundingBox.isOut(other.boundingBox)) return false;
+
     for (const myCurve of this.curves) {
       for (const otherCurve of other.curves) {
-        intersector.Init_1(myCurve.wrapped, otherCurve.wrapped, 1e-6);
+        if (myCurve.boundingBox.isOut(otherCurve.boundingBox)) continue;
+
+        intersector.Init_1(myCurve.wrapped, otherCurve.wrapped, 1e-9);
         if (intersector.NbPoints() || intersector.NbSegments()) return true;
       }
     }
+    intersector.delete();
     return false;
   }
 }

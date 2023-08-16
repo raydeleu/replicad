@@ -1,7 +1,7 @@
 import { Point2D, BoundingBox2d } from "../lib2d";
 import Blueprint from "./Blueprint";
 import CompoundBlueprint from "./CompoundBlueprint";
-import { BlueprintInterface } from "./lib";
+import { DrawingInterface } from "./lib";
 import { asSVG, viewbox } from "./svg";
 
 import { Face } from "../shapes";
@@ -11,12 +11,16 @@ import { Plane, PlaneName, Point } from "../geom";
 import { ScaleMode } from "../curves";
 import Sketches from "../sketches/Sketches";
 
-export default class Blueprints implements BlueprintInterface {
+export default class Blueprints implements DrawingInterface {
   blueprints: Array<Blueprint | CompoundBlueprint>;
   protected _boundingBox: BoundingBox2d | null;
   constructor(blueprints: Array<Blueprint | CompoundBlueprint>) {
     this.blueprints = blueprints;
     this._boundingBox = null;
+  }
+
+  get repr() {
+    return ["Blueprints", ...this.blueprints.map((b) => b.repr)].join("\n");
   }
 
   clone() {
@@ -38,7 +42,7 @@ export default class Blueprints implements BlueprintInterface {
     );
   }
 
-  rotate(angle: number, center: Point2D): Blueprints {
+  rotate(angle: number, center?: Point2D): Blueprints {
     return new Blueprints(
       this.blueprints.map((bp) => bp.rotate(angle, center))
     );
@@ -51,9 +55,11 @@ export default class Blueprints implements BlueprintInterface {
     );
   }
 
-  translate(xDist: number, yDist: number): Blueprints {
+  translate(xDist: number, yDist: number): Blueprints;
+  translate(translationVector: Point2D): Blueprints;
+  translate(xDistOrPoint: number | Point2D, yDist = 0): Blueprints {
     return new Blueprints(
-      this.blueprints.map((bp) => bp.translate(xDist, yDist))
+      this.blueprints.map((bp) => bp.translate(xDistOrPoint as any, yDist))
     );
   }
 

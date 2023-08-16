@@ -1,6 +1,6 @@
 import { Point2D, BoundingBox2d } from "../lib2d";
 import Blueprint from "./Blueprint";
-import { BlueprintInterface } from "./lib";
+import { DrawingInterface } from "./lib";
 import { asSVG, viewbox } from "./svg";
 
 import { Face } from "../shapes";
@@ -10,7 +10,7 @@ import { Plane, PlaneName, Point } from "../geom";
 import { ScaleMode } from "../curves";
 import CompoundSketch from "../sketches/CompoundSketch";
 
-export default class CompoundBlueprint implements BlueprintInterface {
+export default class CompoundBlueprint implements DrawingInterface {
   blueprints: Blueprint[];
   protected _boundingBox: BoundingBox2d | null;
 
@@ -32,6 +32,16 @@ export default class CompoundBlueprint implements BlueprintInterface {
     return this._boundingBox;
   }
 
+  get repr() {
+    return [
+      "Compound Blueprints",
+      "-- Outline",
+      this.blueprints[0].repr,
+      "-- Holes",
+      ...this.blueprints.slice(1).map((b) => b.repr),
+    ].join("\n");
+  }
+
   stretch(
     ratio: number,
     direction: Point2D,
@@ -42,22 +52,24 @@ export default class CompoundBlueprint implements BlueprintInterface {
     );
   }
 
-  rotate(angle: number, center: Point2D): CompoundBlueprint {
+  rotate(angle: number, center?: Point2D): CompoundBlueprint {
     return new CompoundBlueprint(
       this.blueprints.map((bp) => bp.rotate(angle, center))
     );
   }
 
-  scale(scaleFactor: number, center: Point2D): CompoundBlueprint {
+  scale(scaleFactor: number, center?: Point2D): CompoundBlueprint {
     const centerPoint = center || this.boundingBox.center;
     return new CompoundBlueprint(
       this.blueprints.map((bp) => bp.scale(scaleFactor, centerPoint))
     );
   }
 
-  translate(xDist: number, yDist: number): CompoundBlueprint {
+  translate(xDist: number, yDist: number): CompoundBlueprint;
+  translate(translationVector: Point2D): CompoundBlueprint;
+  translate(xDistOrPoint: number | Point2D, yDist = 0): CompoundBlueprint {
     return new CompoundBlueprint(
-      this.blueprints.map((bp) => bp.translate(xDist, yDist))
+      this.blueprints.map((bp) => bp.translate(xDistOrPoint as any, yDist))
     );
   }
 
@@ -99,7 +111,7 @@ export default class CompoundBlueprint implements BlueprintInterface {
   }
 
   toSVGGroup() {
-    return `<g>${this.blueprints.map((b) => b.toSVGPath())}</g>`;
+    return `<g>${this.blueprints.map((b) => b.toSVGPath()).join("")}</g>`;
   }
 
   toSVG(margin = 1) {

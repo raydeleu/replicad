@@ -25,6 +25,13 @@ export type Point =
   | [number, number]
   | { XYZ: () => gp_XYZ; delete: () => void };
 
+export function isPoint(p: unknown): p is Point {
+  if (Array.isArray(p)) return p.length === 3 || p.length === 2;
+  else if (p instanceof Vector) return true;
+  else if (p && typeof (p as any)?.XYZ === "function") return true;
+  return false;
+}
+
 export const makeAx3 = (center: Point, dir: Point, xDir?: Point): gp_Ax3 => {
   const oc = getOC();
   const origin = asPnt(center);
@@ -187,6 +194,21 @@ export class Vector extends WrappingObj<gp_Vec> {
   }
 }
 
+type Direction = Point | "X" | "Y" | "Z";
+
+const DIRECTIONS: Record<string, Point> = {
+  X: [1, 0, 0],
+  Y: [0, 1, 0],
+  Z: [0, 0, 1],
+};
+
+export function makeDirection(p: Direction): Point {
+  if (p === "X" || p === "Y" || p === "Z") {
+    return DIRECTIONS[p];
+  }
+  return p;
+}
+
 export function asPnt(coords: Point): gp_Pnt {
   const v = new Vector(coords);
   const pnt = v.toPnt();
@@ -209,10 +231,20 @@ export class Transformation extends WrappingObj<gp_Trsf> {
     super(transform || new oc.gp_Trsf_1());
   }
 
-  translate(vector: Point): Transformation {
-    const localVect = new Vector(vector);
-    this.wrapped.SetTranslation_1(localVect.wrapped);
-    localVect.delete();
+  translate(xDist: number, yDist: number, zDist: number): Transformation;
+  translate(vector: Point): Transformation;
+  translate(
+    xDistOrVector: number | Point,
+    yDist = 0,
+    zDist = 0
+  ): Transformation {
+    const translation = new Vector(
+      typeof xDistOrVector === "number"
+        ? [xDistOrVector, yDist, zDist]
+        : xDistOrVector
+    );
+
+    this.wrapped.SetTranslation_1(translation.wrapped);
 
     return this;
   }
@@ -369,6 +401,50 @@ export class Plane {
     this._calcTransforms();
   }
 
+  translateTo(point: Point): Plane {
+    const newPlane = this.clone();
+    newPlane.origin = new Vector(point);
+    return newPlane;
+  }
+
+  translate(xDist: number, yDist: number, zDist: number): Plane;
+  translate(vector: Point): Plane;
+  translate(xDistOrVector: number | Point, yDist = 0, zDist = 0): Plane {
+    const translation = new Vector(
+      typeof xDistOrVector === "number"
+        ? [xDistOrVector, yDist, zDist]
+        : xDistOrVector
+    );
+
+    return this.translateTo(this.origin.add(translation));
+  }
+
+  translateX(xDist: number): Plane {
+    return this.translate(xDist, 0, 0);
+  }
+
+  translateY(yDist: number): Plane {
+    return this.translate(0, yDist, 0);
+  }
+
+  translateZ(zDist: number): Plane {
+    return this.translate(0, 0, zDist);
+  }
+
+  pivot(angle: number, direction: Direction = [1, 0, 0]): Plane {
+    const dir = makeDirection(direction);
+    const zDir = new Vector(this.zDir).rotate(angle, [0, 0, 0], dir);
+    const xDir = new Vector(this.xDir).rotate(angle, [0, 0, 0], dir);
+
+    return new Plane(this.origin, xDir, zDir);
+  }
+
+  rotate2DAxes(angle: number): Plane {
+    const xDir = new Vector(this.xDir).rotate(angle, [0, 0, 0], this.zDir);
+
+    return new Plane(this.origin, xDir, this.zDir);
+  }
+
   _calcTransforms(): void {
     const globalCoordSystem = new this.oc.gp_Ax3_1();
     const localCoordSystem = makeAx3(this.origin, this.zDir, this.xDir);
@@ -522,6 +598,7 @@ export class BoundingBox extends WrappingObj<Bnd_Box> {
     const yMax = { current: 0 };
     const zMax = { current: 0 };
 
+    // @ts-ignore missing type in oc
     this.wrapped.Get(xMin, yMin, zMin, xMax, yMax, zMax);
     return [
       [xMin.current, yMin.current, zMin.current],
@@ -549,7 +626,7 @@ export class BoundingBox extends WrappingObj<Bnd_Box> {
   }
 
   get depth(): number {
-    const [[, , zmin], [, zmax]] = this.bounds;
+    const [[, , zmin], [, , zmax]] = this.bounds;
     return Math.abs(zmax - zmin);
   }
 

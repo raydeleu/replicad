@@ -52,8 +52,8 @@ const config = {
           },
           { to: "/docs/api/", label: "API", position: "left" },
           {
-            href: "https://studio.replicad.xyz/visualiser",
-            label: "Visualiser",
+            href: "https://studio.replicad.xyz/workbench",
+            label: "Workbench",
           },
           {
             href: "https://github.com/sgenoud/replicad",
@@ -62,6 +62,13 @@ const config = {
           },
         ],
       },
+      algolia: {
+        appId: "O4BGYDV04E",
+        apiKey: "24a6b1fd7a8eaec7b47cb861eddbd84f",
+        indexName: "replicad",
+        contextualSearch: true,
+      },
+
       footer: {
         style: "dark",
         links: [
@@ -104,6 +111,7 @@ const config = {
         entryPoints: ["../replicad/src/index.ts"],
         tsconfig: "../replicad/tsconfig.json",
         watch: process.env.TYPEDOC_WATCH,
+        sidebar: { position: 100 },
       },
     ],
   ],

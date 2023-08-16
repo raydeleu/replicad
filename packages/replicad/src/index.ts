@@ -9,13 +9,12 @@ export {
   Sketcher,
   BaseSketcher2d,
   FaceSketcher,
-  GenericSketcher,
-  SplineConfig,
-  Point2D,
   BlueprintSketcher,
   BoundingBox2d,
   Curve2D,
 };
+
+export type { GenericSketcher, SplineConfig, Point2D };
 
 export * from "./constants";
 export * from "./oclib";
@@ -31,3 +30,5 @@ export * from "./blueprints";
 export * from "./sketches";
 export * from "./text";
 export * from "./importers";
+export * from "./draw";
+export * from "./projection";

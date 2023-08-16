@@ -9,9 +9,15 @@ mainBuild:
     - symbol: TColStd_Array1OfBoolean
     - symbol: TColgp_Array1OfVec
     - symbol: TColStd_Array1OfInteger
+    - symbol: TColStd_Array1OfReal 
     - symbol: Poly_Array1OfTriangle
     - symbol: Standard_Transient
     - symbol: Precision
+
+    - symbol: Interface_Static
+    - symbol: Interface_TypedValue
+    - symbol: MoniTool_TypedValue
+    - symbol: Handle_StepData_StepModel
 
     - symbol: gp_XYZ
     - symbol: gp_XY
@@ -29,6 +35,7 @@ mainBuild:
 
     - symbol: Geom2d_Line
     - symbol: Geom2d_Curve
+    - symbol: Geom2d_OffsetCurve
     - symbol: Geom2d_BoundedCurve
     - symbol: Geom2d_TrimmedCurve
     - symbol: Geom2d_BezierCurve
@@ -36,6 +43,7 @@ mainBuild:
     - symbol: Geom2d_Geometry
     - symbol: Geom2d_Ellipse
     - symbol: Geom2d_Circle
+    - symbol: Geom2d_Conic
     - symbol: Handle_Geom2d_Geometry
     - symbol: Handle_Geom2d_Line
     - symbol: Handle_Geom2d_Curve
@@ -49,12 +57,15 @@ mainBuild:
     - symbol: gp_Pnt2d
     - symbol: gp_Dir2d
     - symbol: gp_Ax2d
+    - symbol: gp_Ax22d
     - symbol: gp_Circ2d
     - symbol: gp_Elips2d
     - symbol: GCE2d_Root
     - symbol: GCE2d_MakeSegment
     - symbol: GCE2d_MakeArcOfCircle
     - symbol: GCE2d_MakeArcOfEllipse
+    - symbol: GCE2d_MakeCircle
+    - symbol: GCE2d_MakeEllipse
 
     - symbol: GeomLib
     - symbol: gp_Trsf2d
@@ -64,7 +75,8 @@ mainBuild:
     - symbol: BndLib_Add2dCurve
     - symbol: Geom2dAPI_InterCurveCurve
     - symbol: Geom2dAPI_ProjectPointOnCurve 
-
+    - symbol: Geom2dAPI_PointsToBSpline
+    - symbol: Geom2dAPI_ExtremaCurveCurve 
 
     - symbol: Bnd_Box
     - symbol: Bnd_OBB
@@ -144,8 +156,11 @@ mainBuild:
 
     - symbol: Geom2dAdaptor_Curve
     - symbol: Adaptor2d_Curve2d
+    - symbol: Handle_Adaptor2d_Curve2d
+    - symbol: BRepAdaptor_Curve2d
 
     - symbol: Geom2dConvert_BSplineCurveToBezierCurve
+    - symbol: Geom2dConvert_ApproxCurve
     - symbol: Geom2dConvert
     - symbol: Convert_ParameterisationType
 
@@ -185,6 +200,7 @@ mainBuild:
     - symbol: BRepBuilderAPI_MakeSolid
     - symbol: BRepBuilderAPI_TransitionMode
     - symbol: BRepBuilderAPI_Sewing
+    - symbol: BRepBuilderAPI_WireError
     - symbol: BRepPrimAPI_MakeOneAxis
     - symbol: BRepPrimAPI_MakeCylinder
     - symbol: BRepPrimAPI_MakeBox
@@ -224,8 +240,15 @@ mainBuild:
     - symbol: StlAPI_Reader
     - symbol: ShapeUpgrade_UnifySameDomain
 
+    - symbol: ShapeFix_EdgeConnect
+
     - symbol: StlAPI
 
+    - symbol: HLRBRep_Algo
+    - symbol: Handle_HLRBRep_Algo
+    - symbol: HLRBRep_InternalAlgo
+    - symbol: HLRAlgo_Projector
+    - symbol: HLRBRep_HLRToShape
 
   emccFlags:
     - -sEXPORT_ES6=1
